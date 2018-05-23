@@ -11,6 +11,9 @@ class Main():
     dataset_x = []
     dataset_y = []
     test = []
+    training_x = []
+    training_y = []
+    test_set = []
 
     def __init__(self):
 
@@ -30,104 +33,120 @@ class Main():
                 self.test.append(row)
 
     def processor(self):
-        train_x = self.get_training_set()[0]
-        train_y = self.get_training_set()[1]
-        test = self.get_test_set()
-        x_train, x_test, y_train, y_test = train_test_split(train_x, train_y, test_size=0.3)
-        predictions = self.trainer(train_x, train_y, test, x_test)
-        predictions_1 = list(predictions[0])
-        predictions_2 = list(predictions[1])
+        train_set = self.get_training_set()
+        train_x_sj = train_set[0]
+        train_y_sj = train_set[1]
+        train_x_iq = train_set[2]
+        train_y_iq = train_set[3]
+        # test_set = self.get_test_set()
+        # test_sj = test_set[0]
+        # test_iq = test_set[1]
+        x_train_sj, x_test_sj, y_train_sj, y_test_sj = train_test_split(train_x_sj, train_y_sj, test_size=0.3)
+        # x_train_iq, x_test_iq, y_train_iq, y_test_iq = train_test_split(train_x_iq, train_y_iq, test_size=0.3)
+        predictions = self.trainer(x_train_sj, y_train_sj, x_test_sj)
+        # predictions = self.trainer(x_train_iq, y_train_iq, x_test_iq)
+        # predictions = self.trainer(train_x_sj, train_y_sj, test_sj)
+        # predictions = self.trainer(train_x_iq, train_y_iq, test_iq)
         preds = []
-        for i in predictions_1:
+        for i in predictions:
             preds.append(round(i))
-        accuracy = accuracy_score(y_test, preds)
-        mean_abs_err = mean_absolute_error(y_test, predictions_1)
+        accuracy = accuracy_score(y_test_sj, preds)
+        # accuracy = accuracy_score(y_test_iq, preds)
+        mean_abs_err = mean_absolute_error(y_test_sj, preds)
+        # mean_abs_err = mean_absolute_error(y_test_iq, preds)
         print accuracy
         print mean_abs_err
-        print mean_absolute_error(y_test, preds)
-        preds_2 = []
-        for i in predictions_2:
-            preds_2.append(int(round(i)))
-        with open('Results/results.csv', 'wb') as results_file:
-            results = csv.writer(results_file, delimiter=',')
-            results.writerow(["city", "year", "weekofyear", "total_cases"])
-            for i in range(0, len(self.test) - 1):
-                results.writerow([self.test[i + 1][0], self.test[i + 1][1], self.test[i + 1][2]] + [preds_2[i]])
+        # file_name = 'results_sj.csv'
+        # file_name = 'results_iq.csv'
+        # with open('Results/' + file_name, 'wb') as results_file:
+        #     results = csv.writer(results_file, delimiter=',')
+        #     results.writerow(["city", "year", "weekofyear", "total_cases"])
+        #     for i in range(0, len(self.test) - 1):
+        #         results.writerow([self.test[i + 1][0], self.test[i + 1][1], self.test[i + 1][2]] + [preds[i]])
 
 
     def get_training_set(self):
 
-        training_x = self.dataset_x[1:]
-        training_y = self.dataset_y[1:]
+        self.training_x = self.dataset_x[1:]
+        self.training_y = self.dataset_y[1:]
 
         x_train_sj = []
         y_train_sj = []
         x_train_iq = []
         y_train_iq = []
 
-        for i in range(0, len(training_x)):
-            if '' not in training_x[i]:
-                row_x = []
-                row_x.append(int(training_x[i][1]))
-                row_x.append(int(training_x[i][2]))
-                for element in training_x[i][4:]:
-                    row_x.append(float(element))
-
-                if training_x[i][0] == 'sj':
-                    x_train_sj.append(row_x)
-                    y_train_sj.append(int(training_y[i][3]))
+        for i in range(0, len(self.training_x)):
+            row_x = []
+            for j in range(4, len(self.training_x[i])):
+                if self.training_x[i][j] != '':
+                    row_x.append(float(self.training_x[i][j]))
                 else:
-                    x_train_iq.append(row_x)
-                    y_train_iq.append(int(training_y[i][3]))
+                    row_x.append(self.get_missing_value_average(j, i, False))
+
+            if self.training_x[i][0] == 'sj':
+                x_train_sj.append(row_x)
+                y_train_sj.append(int(self.training_y[i][3]))
+            else:
+                x_train_iq.append(row_x)
+                y_train_iq.append(int(self.training_y[i][3]))
 
         return x_train_sj, y_train_sj, x_train_iq, y_train_iq
 
-    def trainer(self, x_train, y_train, test, x_test):
+    def trainer(self, x_train, y_train, x_test):
 
         clf = linear_model.LinearRegression()
         clf.fit(x_train, y_train)
-        predictions_1 = clf.predict(x_test)
-        predictions_2 = clf.predict(test)
+        predictions = clf.predict(x_test)
         filename = 'sj.sav'
-        joblib.dump(clf, "ModelData/" + filename)
-        return predictions_1, predictions_2
+        # filename = 'iq.sav'
+        joblib.dump(clf, "Models/" + filename)
+        return predictions
 
     def get_test_set(self):
-        test = []
-        test_set = self.test[1:]
-        for row in test_set:
-            if '' not in row:
-                new_row = []
-                new_row.append(0 if row[0] == "sj" else 1)
-                new_row.append(int(row[1]))
-                new_row.append(int(row[2]))
-                for element in row[4:]:
-                    new_row.append(float(element))
-                test.append(new_row)
+        test_sj = []
+        test_iq = []
+        self.test_set = self.test[1:]
+        for i in range(0, len(self.training_x)):
+            row_x = []
+            for j in range(4, len(self.test_set[4:])):
+                if self.training_x[i][j] != '':
+                    row_x.append(float(self.test_set[i][j]))
+                else:
+                    row_x.append(self.get_missing_value_average(j, i, True))
 
+            if self.training_x[i][0] == 'sj':
+                test_sj.append(row_x)
             else:
-                for i in range(0, len(row)):
-                    if row[i] == '':
-                        row[i] = 0
-                new_row = []
-                new_row.append(0 if row[0] == "sj" else 1)
-                new_row.append(int(row[1]))
-                new_row.append(int(row[2]))
-                for element in row[4:]:
-                    new_row.append(float(element))
-                test.append(new_row)
+                test_iq.append(row_x)
 
-        return test
+        return test_sj, test_iq
 
     def accuracy_checker(self):
         filename = 'sj.sav'
-        clf = joblib.load("ModelData/" + filename)
+        clf = joblib.load("Models/" + filename)
 
-    def get_missing_value_average(self, attr_no, raw_no):
-
-
-
-
+    def get_missing_value_average(self, attr_no, raw_no, is_test):
+        moving_avg_set = []
+        index = raw_no - 1
+        while len(moving_avg_set) < 5:
+            if index < 0:
+                index = attr_no + 1
+            if is_test:
+                if self.test_set[index][attr_no] != '':
+                    moving_avg_set.append(float(self.test_set[index][attr_no]))
+            else:
+                if self.training_x[index][attr_no] != '':
+                    moving_avg_set.append(float(self.training_x[index][attr_no]))
+            if index > raw_no:
+                index += 1
+            else:
+                index -= 1
+        missing_value = sum(moving_avg_set) / len(moving_avg_set)
+        if is_test:
+            self.test_set[raw_no][attr_no] = missing_value
+        else:
+            self.training_x[raw_no][attr_no] = missing_value
+        return missing_value
 
 
 Main().processor()
