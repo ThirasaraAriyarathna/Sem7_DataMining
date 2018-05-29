@@ -38,31 +38,16 @@ class Main():
         train_y_sj = train_set[1]
         train_x_iq = train_set[2]
         train_y_iq = train_set[3]
-        # test_set = self.get_test_set()
-        # test_sj = test_set[0]
-        # test_iq = test_set[1]
-        x_train_sj, x_test_sj, y_train_sj, y_test_sj = train_test_split(train_x_sj, train_y_sj, test_size=0.3)
-        # x_train_iq, x_test_iq, y_train_iq, y_test_iq = train_test_split(train_x_iq, train_y_iq, test_size=0.3)
-        predictions = self.trainer(x_train_sj, y_train_sj, x_test_sj)
-        # predictions = self.trainer(x_train_iq, y_train_iq, x_test_iq)
-        # predictions = self.trainer(train_x_sj, train_y_sj, test_sj)
-        # predictions = self.trainer(train_x_iq, train_y_iq, test_iq)
-        preds = []
-        for i in predictions:
-            preds.append(round(i))
-        accuracy = accuracy_score(y_test_sj, preds)
-        # accuracy = accuracy_score(y_test_iq, preds)
-        mean_abs_err = mean_absolute_error(y_test_sj, preds)
-        # mean_abs_err = mean_absolute_error(y_test_iq, preds)
-        print accuracy
-        print mean_abs_err
-        # file_name = 'results_sj.csv'
-        # file_name = 'results_iq.csv'
-        # with open('Results/' + file_name, 'wb') as results_file:
-        #     results = csv.writer(results_file, delimiter=',')
-        #     results.writerow(["city", "year", "weekofyear", "total_cases"])
-        #     for i in range(0, len(self.test) - 1):
-        #         results.writerow([self.test[i + 1][0], self.test[i + 1][1], self.test[i + 1][2]] + [preds[i]])
+        test_set = self.get_test_set()
+        test_sj = test_set[0]
+        test_iq = test_set[1]
+        # self.accuracy_checker(train_x_sj, train_y_sj, 'sj')
+        # preds = self.predict_values(test_sj, 'sj')
+        # self.print_results(preds, 'sj')
+        self.accuracy_checker(train_x_iq, train_y_iq, 'iq')
+        preds = self.predict_values(test_iq, 'iq')
+        self.print_results(preds, 'iq')
+
 
 
     def get_training_set(self):
@@ -92,13 +77,12 @@ class Main():
 
         return x_train_sj, y_train_sj, x_train_iq, y_train_iq
 
-    def trainer(self, x_train, y_train, x_test):
+    def trainer(self, x_train, y_train, x_test, name):
 
         clf = linear_model.LinearRegression()
         clf.fit(x_train, y_train)
         predictions = clf.predict(x_test)
-        filename = 'sj.sav'
-        # filename = 'iq.sav'
+        filename = name + '.sav'
         joblib.dump(clf, "Models/" + filename)
         return predictions
 
@@ -106,24 +90,30 @@ class Main():
         test_sj = []
         test_iq = []
         self.test_set = self.test[1:]
-        for i in range(0, len(self.training_x)):
+        for i in range(0, len(self.test_set)):
             row_x = []
-            for j in range(4, len(self.test_set[4:])):
-                if self.training_x[i][j] != '':
+            for j in range(4, len(self.test_set[i])):
+                if self.test_set[i][j] != '':
                     row_x.append(float(self.test_set[i][j]))
                 else:
                     row_x.append(self.get_missing_value_average(j, i, True))
 
-            if self.training_x[i][0] == 'sj':
+            if self.test_set[i][0] == 'sj':
                 test_sj.append(row_x)
             else:
                 test_iq.append(row_x)
 
         return test_sj, test_iq
 
-    def accuracy_checker(self):
-        filename = 'sj.sav'
-        clf = joblib.load("Models/" + filename)
+    def accuracy_checker(self, train_x, train_y, name):
+
+        x_train, x_test, y_train, y_test = train_test_split(train_x, train_y, test_size=0.3)
+        predictions = self.trainer(train_x, train_y, x_test, name)
+        preds = []
+        for i in predictions:
+            preds.append(round(i))
+        mean_abs_err = mean_absolute_error(y_test, preds)
+        print name + ': ' + str(mean_abs_err)
 
     def get_missing_value_average(self, attr_no, raw_no, is_test):
         moving_avg_set = []
@@ -147,6 +137,32 @@ class Main():
         else:
             self.training_x[raw_no][attr_no] = missing_value
         return missing_value
+
+    def predict_values(self, samples, name):
+
+        filename = name + '.sav'
+        clf = joblib.load("Models/" + filename)
+        predictions = clf.predict(samples)
+        preds = []
+        for i in predictions:
+            preds.append(int(round(i)))
+        return preds
+
+    def print_results(self, preds, name):
+
+        filename = 'results_' + name + '.csv'
+        with open('Results/' + filename, 'wb') as results_file:
+            results = csv.writer(results_file, delimiter=',')
+            results.writerow(["city", "year", "weekofyear", "total_cases"])
+            if name == 'sj':
+                start = 0
+                end = sum(x.count('sj') for x in self.test[1:])
+            else:
+                start = sum(x.count('sj') for x in self.test[1:])
+                end = len(self.test) - 1
+            for i in range(start, end):
+                if self.test[i + 1][0] == name:
+                    results.writerow([self.test[i + 1][0], self.test[i + 1][1], self.test[i + 1][2]] + [preds[i - start]])
 
 
 Main().processor()
